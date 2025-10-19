@@ -1,69 +1,6 @@
-// ============================================================================
-// MAIN.JS — Versão binária (Sim/Não) para “A narrativa descreve um único evento?”
-// ============================================================================
-
-PennController.ResetPrefix(null);
-// DebugOff(); // use DESCOMENTADO só na coleta final, COMENTE durante testes
-
-Sequence(
-  "PARTICIPANT_INFO",
-  "WELCOME",
-  "INSTRUCTIONS",
-  "MAIN_START",
-  rshuffle("main","check"),
-  "SEND_RESULTS",
-  "GOODBYE"
-);
-
-// ============================================================================
-// TELAS ESTÁTICAS
-// ============================================================================
-newTrial("PARTICIPANT_INFO",
-  newHtml("participant_info_html", `
-    <div class='PennController' style='width: 70%; margin: auto;'>
-      <h3>Identificação</h3>
-      <p>Insira um ID (e-mail ou código) e clique em Continuar.</p>
-    </div>
-  `).print(),
-  newTextInput("participant_id_input","")
-    .css("margin-bottom","1em")
-    .print()
-    .log(),
-  newButton("continue_button","Continuar").center().print()
-    .wait( getTextInput("participant_id_input").test.text(/.+/) ),
-  newVar("PARTICIPANT_ID").global().set( getTextInput("participant_id_input") )
-);
-
-newTrial("WELCOME",
-  newHtml("welcome_html","welcome.html").print(), // vem de chunk_includes/
-  newButton("Aceito e desejo participar").center().print().wait()
-);
-
-newTrial("INSTRUCTIONS",
-  newHtml("instructions_html", `
-    <div class='PennController' style='width: 70%; margin: auto; text-align: left; font-size: 1.05em;'>
-      <h3>Instruções</h3>
-      <p>Você lerá narrativas curtas. Em cada uma, responda:</p>
-      <p style="margin: 0.8em 0;"><b>A narrativa descreve um único evento?</b></p>
-      <ul>
-        <li><b>Sim, um único evento</b>: as ações relatadas fazem parte do mesmo evento/situação contínua.</li>
-        <li><b>Não, mais de um evento</b>: há mudança de evento (por ex., mudança de tempo, lugar, objetivo).</li>
-      </ul>
-      <p>Algumas narrativas terão uma <b>verificação de atenção</b> (S/N).</p>
-      <p>Pressione a <b>barra de espaço</b> para começar.</p>
-    </div>
-  `).print(),
-  newKey("start_main"," ").wait()
-);
-
-newTrial("MAIN_START",
-  newText("O experimento vai começar.").css("font-size","1.1em").center().print(),
-  newTimer(1500).start().wait()
-);
-
-// ============================================================================
-// TEMPLATE (LÊ stimuli.csv) E GERA OS TRIALS
-// ============================================================================
+// =============================================================================
+// PARTE 3: TEMPLATE (LÊ stimuli.csv) E GERA OS TRIALS
+// =============================================================================
 GetTable().setGroupColumn("List"); // A/B/C/D ↔ grupos (0..3)
 
 Template("stimuli.csv", row => {
@@ -71,55 +8,83 @@ Template("stimuli.csv", row => {
 
   return newTrial(label,
 
-    // NARRATIVA (fonte maior)
+    // NARRATIVA (maior e legível)
     newText("narrativa", row.Narrative)
-      .css("font-size","1.22em")
-      .cssContainer({width:"70%", margin:"auto", "margin-bottom":"1.4em", "text-align":"left"})
+      .cssContainer({
+        width: "70%", margin: "auto",
+        "font-size": "1.5em", "line-height": "1.6",
+        "text-align": "left", "margin-bottom": "1.6em"
+      })
       .print(),
 
-    // BLOCO PRINCIPAL: pergunta binária (só para Type == "main")
     ...(row.Type === "main" ? [
-      newText("pergunta_binaria", "A narrativa descreve um único evento?")
-        .css("font-size","1.15em")
-        .center()
+
+      // -------------------------
+      // Q1 — EVENTO (binária)
+      // -------------------------
+      newText("q_evento", "A narrativa descreve um único evento?")
+        .css({"font-size":"1.25em","text-align":"center","margin":"0.4em 0"})
+        .bold()
         .print(),
 
-      // ESCOLHA BINÁRIA (centralizada)
-      newScale("evento_unico", "Sim, um único evento", "Não, mais de um evento")
+      // Use opções curtas no Scale e deixe a explicação longa para as instruções
+      newScale("evento_unico", "Sim", "Não")
         .radio()
+        .labelsPosition("right")   // garante rótulos ao lado dos círculos
+        .css({"font-size":"1.15em"})
+        .center()
+        .print()
+        .log(),                    // registra “Sim” ou “Não”
+
+      // -------------------------
+      // Q2 — NATURALIDADE (Likert 1–7)
+      // -------------------------
+      newText("q_nat", "A narrativa soa natural?")
+        .css({"font-size":"1.25em","text-align":"center","margin":"1.0em 0 0.2em 0"})
+        .bold()
+        .print(),
+
+      newScale("escala_naturalidade", 7)
+        .before( newText("Pouco natural").css("font-size","1.05em") )
+        .after(  newText("Muito natural").css("font-size","1.05em") )
+        .labelsPosition("top")
+        .css({"font-size":"1.15em"})
         .center()
         .print()
         .log(),
 
-      // BOTÃO CONTINUAR (centralizado e com validação)
+      // Botão CONTINUAR centralizado e com validação das duas respostas
       newButton("continuar","Continuar")
+        .css({"margin-top":"1.4em","font-size":"1.1em"})
         .center()
-        .css("margin-top","1.2em")
         .print()
-        .wait( getScale("evento_unico").test.selected() )
+        .wait(
+          getScale("evento_unico").test.selected()
+            .and( getScale("escala_naturalidade").test.selected() )
+        )
+
     ] : [
 
-      // BLOCO CHECK (S/N) — permanece como verificação de atenção
+      // -------------------------
+      // TRIALS DE CHECK (S/N)
+      // -------------------------
       newText("pergunta_check", `<p><b>Verificação:</b> ${row.CompQuestion}</p>`)
-        .css("font-size","1.1em")
-        .center()
-        .print(),
+        .css({"font-size":"1.15em","text-align":"center"}).print(),
       newText("instrucao_check", "Pressione S para 'Sim' ou N para 'Não'.")
-        .center()
-        .print(),
+        .css({"text-align":"center"}).print(),
       newKey("resposta_check","SN").log().wait()
         .test.pressed( String(row.CompAnswer||"S").trim().toUpperCase() )
-        .failure( newText("<p style='color:#b00'>Resposta incorreta registrada.</p>").center().print() ),
+        .failure( newText("<p style='color:#b00;text-align:center'>Resposta incorreta registrada.</p>").print() ),
 
       newButton("continuar","Continuar")
+        .css({"margin-top":"1.2em","font-size":"1.1em"})
         .center()
-        .css("margin-top","1.2em")
         .print()
         .wait()
     ]),
 
   )
-  // LOGS (inclui a resposta binária quando houver)
+  // LOGS
   .log("ParticipantID", getVar("PARTICIPANT_ID"))
   .log("ItemID", row.ItemID)
   .log("Condition", row.Condition)
@@ -127,22 +92,5 @@ Template("stimuli.csv", row => {
   .log("List", row.List)
   .log("Type", row.Type)
   .log("BinaryAnswer", row.Type === "main" ? getScale("evento_unico") : "")
-  ;
+  .log("Naturalidade", row.Type === "main" ? getScale("escala_naturalidade") : "");
 });
-
-// ============================================================================
-// ENVIO E TELA FINAL
-// ============================================================================
-newTrial("SEND_RESULTS",
-  SendResults(),
-  newText("Por favor, aguarde enquanto salvamos os seus dados.").center().print(),
-  newTimer(1500).start().wait()
-);
-
-newTrial("GOODBYE",
-  newText("Obrigado por participar! Seus dados foram salvos. Você já pode fechar esta janela.")
-    .css("font-size","1.05em")
-    .center()
-    .print(),
-  newButton("Finalizar").center().print().wait()
-);
